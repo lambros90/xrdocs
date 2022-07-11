@@ -1,0 +1,339 @@
+vrf red
+ address-family ipv4 unicast
+  import route-target
+   2:10
+  !
+  export route-target
+   2:10
+  !
+ !
+ address-family ipv4 multicast
+ !
+!
+vrf blue
+ address-family ipv4 unicast
+  import route-target
+   1:10
+  !
+  export route-target
+   1:10
+  !
+ !
+ address-family ipv4 multicast
+ !
+!
+interface Loopback0
+ ipv4 address 1.1.1.6 255.255.255.255
+!
+interface TenGigE0/0/0/4
+ ipv4 address 11.4.6.6 255.255.255.0
+ lldp
+ !
+!
+interface TenGigE0/0/0/9
+ ipv4 address 10.4.6.6 255.255.255.0
+ lldp
+ !
+!
+interface TenGigE0/0/0/10
+ ipv4 address 11.3.6.6 255.255.255.0
+ lldp
+ !
+!
+interface TenGigE0/0/0/11
+ ipv4 address 10.3.6.6 255.255.255.0
+ lldp
+ !
+!
+interface TenGigE0/0/0/12.1 l2transport
+ encapsulation dot1q 1
+!
+interface TenGigE0/0/0/12.2 l2transport
+ encapsulation dot1q 2
+!
+interface TenGigE0/0/0/14
+ ipv4 address 10.5.6.6 255.255.255.0
+ lldp
+ !
+!
+interface BVI1
+ vrf blue
+ ipv4 address 10.13.8.1 255.255.255.0
+!
+interface BVI2
+ vrf red
+ ipv4 address 10.13.9.1 255.255.255.0
+!
+route-policy treeSID
+  set core-tree sr-p2mp
+end-policy
+!
+router isis 1
+ net 49.0001.0000.0000.0006.00
+ distribute link-state
+ address-family ipv4 unicast
+  metric-style wide
+  mpls traffic-eng level-2-only
+  mpls traffic-eng router-id Loopback0
+  router-id 1.1.1.6
+  segment-routing mpls
+ !
+ interface Loopback0
+  passive
+  address-family ipv4 unicast
+   prefix-sid absolute 16006
+  !
+ !
+ interface TenGigE0/0/0/4
+  circuit-type level-2-only
+  point-to-point
+  address-family ipv4 unicast
+   fast-reroute per-prefix
+   fast-reroute per-prefix ti-lfa
+   metric 10
+  !
+ !
+ interface TenGigE0/0/0/9
+  circuit-type level-2-only
+  point-to-point
+  address-family ipv4 unicast
+   fast-reroute per-prefix
+   fast-reroute per-prefix ti-lfa
+   metric 10
+  !
+ !
+ interface TenGigE0/0/0/10
+  circuit-type level-2-only
+  point-to-point
+  address-family ipv4 unicast
+   fast-reroute per-prefix
+   fast-reroute per-prefix ti-lfa
+   metric 10
+  !
+ !
+ interface TenGigE0/0/0/11
+  circuit-type level-2-only
+  point-to-point
+  address-family ipv4 unicast
+   fast-reroute per-prefix
+   fast-reroute per-prefix ti-lfa
+   metric 10
+  !
+ !
+ interface TenGigE0/0/0/14
+  circuit-type level-2-only
+  point-to-point
+  address-family ipv4 unicast
+   fast-reroute per-prefix
+   fast-reroute per-prefix ti-lfa
+   metric 10
+  !
+ !
+!
+router bgp 1
+ nsr
+ bgp router-id 1.1.1.6
+ bgp graceful-restart
+ address-family ipv4 unicast
+  redistribute connected
+ !
+ address-family vpnv4 unicast
+ !
+ address-family ipv4 mvpn
+ !
+ neighbor 1.1.1.1
+  remote-as 1
+  update-source Loopback0
+  address-family ipv4 unicast
+  !
+  address-family vpnv4 unicast
+  !
+  address-family ipv4 mvpn
+   route-policy pass-all in
+   route-policy pass-all out
+  !
+ !
+ vrf red
+  rd auto
+  address-family ipv4 unicast
+   redistribute connected
+  !
+  address-family ipv4 mvpn
+  !
+ !
+ vrf blue
+  rd auto
+  address-family ipv4 unicast
+   redistribute connected
+  !
+  address-family ipv4 mvpn
+  !
+ !
+!
+l2vpn
+ bridge group bg
+  bridge-domain red
+   igmp snooping profile red
+   interface TenGigE0/0/0/12.2
+   !
+   routed interface BVI2
+   !
+  !
+  bridge-domain blue
+   igmp snooping profile blue
+   interface TenGigE0/0/0/12.1
+   !
+   routed interface BVI1
+   !
+  !
+ !
+!
+multicast-routing
+ address-family ipv4
+  mdt source Loopback0
+  interface all enable
+  static sr-policy p2mp-te-global
+  static sr-policy p2mp-igp-global
+  mdt static segment-routing
+ !
+ vrf red
+  address-family ipv4
+   interface all enable
+   bgp auto-discovery segment-routing
+   !
+   mdt default segment-routing mpls color 10
+   mdt data segment-routing mpls 1 color 10 threshold 0
+  !
+ !
+ vrf blue
+  address-family ipv4
+   interface all enable
+   bgp auto-discovery segment-routing
+   !
+   mdt default segment-routing mpls color 20
+   mdt data segment-routing mpls 1 color 20 threshold 0
+  !
+ !
+ vrf vpn1
+  address-family ipv4
+   interface all enable
+   static sr-policy p2mp-igp-red-vpn1
+   static sr-policy p2mp-igp-blue-vpn1
+  !
+ !
+!
+segment-routing
+ global-block 16000 23999
+ local-block 15000 15999
+ traffic-eng
+  interface TenGigE0/0/0/4
+   affinity
+    name BLUE
+   !
+   metric 11
+  !
+  interface TenGigE0/0/0/9
+   affinity
+    name BLUE
+   !
+   metric 11
+  !
+  interface TenGigE0/0/0/10
+   affinity
+    name RED
+   !
+   metric 11
+  !
+  interface TenGigE0/0/0/11
+   affinity
+    name RED
+   !
+   metric 11
+  !
+  on-demand color 10
+   dynamic
+    metric
+     type igp
+    !
+    affinity
+     include-any
+      name RED
+     !
+    !
+   !
+  !
+  on-demand color 20
+   dynamic
+    metric
+     type igp
+    !
+    affinity
+     include-any
+      name BLUE
+     !
+    !
+   !
+  !
+  affinity-map
+   name RED bit-position 23
+   name BLUE bit-position 24
+  !
+  pcc
+   pce address ipv4 1.1.1.2
+    precedence 100
+   !
+  !
+ !
+!
+router pim
+ vrf red
+  address-family ipv4
+   rpf topology route-policy treeSID
+   mdt c-multicast-routing bgp
+   !
+  !
+ !
+ vrf blue
+  address-family ipv4
+   rpf topology route-policy treeSID
+   mdt c-multicast-routing bgp
+   !
+  !
+ !
+!
+performance-measurement
+ interface TenGigE0/0/0/4
+  delay-measurement
+   advertise-delay 12
+  !
+ !
+ interface TenGigE0/0/0/9
+  delay-measurement
+   advertise-delay 12
+  !
+ !
+ interface TenGigE0/0/0/10
+  delay-measurement
+   advertise-delay 12
+  !
+ !
+ interface TenGigE0/0/0/11
+  delay-measurement
+   advertise-delay 12
+  !
+ !
+ interface TenGigE0/0/0/14
+  delay-measurement
+   advertise-delay 12
+  !
+ !
+!
+igmp snooping profile red
+ static group 232.1.1.2 source 10.10.9.2
+!
+igmp snooping profile blue
+ static group 232.1.1.1 source 10.10.8.2
+!
+igmp snooping profile test
+ static group 232.1.1.1 source 10.10.8.2
+!

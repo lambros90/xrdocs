@@ -1,0 +1,185 @@
+pce
+ address ipv4 1.1.1.2
+ segment-routing
+  traffic-eng
+   p2mp
+    endpoint-set leaf-R6
+     ipv4 1.1.1.6
+    !
+    endpoint-set leaf-R5-R6
+     ipv4 1.1.1.5
+     ipv4 1.1.1.6
+    !
+    label-range min 15400 max 15600
+    policy p2mp-te-global
+     source ipv4 1.1.1.1
+     color 101 endpoint-set leaf-R5-R6
+     treesid mpls 15101
+     candidate-paths
+      preference 100
+       dynamic
+        metric
+         type te
+        !
+       !
+      !
+     !
+    !
+    policy p2mp-igp-global
+     source ipv4 1.1.1.1
+     color 100 endpoint-set leaf-R5-R6
+     treesid mpls 15100
+     candidate-paths
+      preference 100
+       dynamic
+        metric
+         type igp
+        !
+       !
+      !
+     !
+    !
+    policy p2mp-delay-global
+     source ipv4 1.1.1.1
+     color 102 endpoint-set leaf-R5-R6
+     treesid mpls 15102
+     candidate-paths
+      preference 100
+       dynamic
+        metric
+         type latency
+        !
+       !
+      !
+     !
+    !
+    policy p2mp-igp-red-vpn1
+     source ipv4 1.1.1.1
+     color 200 endpoint-set leaf-R5-R6
+     treesid mpls 15200
+     candidate-paths
+      constraints
+       affinity
+        include-any
+         RED
+        !
+       !
+      !
+      preference 100
+       dynamic
+        metric
+         type igp
+        !
+       !
+      !
+     !
+    !
+    policy p2mp-igp-blue-vpn1
+     source ipv4 1.1.1.1
+     color 201 endpoint-set leaf-R5-R6
+     treesid mpls 15201
+     candidate-paths
+      constraints
+       affinity
+        include-any
+         BLUE
+        !
+       !
+      !
+      preference 100
+       dynamic
+        metric
+         type igp
+        !
+       !
+      !
+     !
+    !
+   !
+   affinity bit-map
+    RED 23
+    BLUE 24
+   !
+  !
+ !
+!
+interface Loopback0
+ ipv4 address 1.1.1.2 255.255.255.255
+!
+interface TenGigE0/0/0/10
+ ipv4 address 10.2.4.2 255.255.255.0
+ lldp
+ !
+!
+router isis 1
+ net 49.0001.0000.0000.0002.00
+ distribute link-state
+ address-family ipv4 unicast
+  metric-style wide
+  mpls traffic-eng level-2-only
+  mpls traffic-eng router-id Loopback0
+  router-id 1.1.1.2
+ !
+ interface Loopback0
+  passive
+  address-family ipv4 unicast
+  !
+ !
+ interface TenGigE0/0/0/10
+  circuit-type level-2-only
+  point-to-point
+  address-family ipv4 unicast
+   fast-reroute per-prefix
+   metric 10
+  !
+ !
+!
+multicast-routing
+ address-family ipv4
+  interface Loopback0
+   enable
+  !
+  interface Bundle-Ether12.12
+   enable
+  !
+  interface Bundle-Ether23.12
+   enable
+  !
+  interface Bundle-Ether26.26
+   enable
+  !
+  log-traps
+  oom-handling
+  accounting per-prefix
+ !
+ address-family ipv6
+  log-traps
+  accounting per-prefix
+ !
+!
+router pim
+ address-family ipv4
+  rp-address 20.20.20.2 PIP-MDT-RANGE
+  global maximum route-interfaces 80000 threshold 64000
+  log neighbor changes
+  interface Loopback0
+   enable
+  !
+  interface Bundle-Ether12.12
+   enable
+  !
+  interface Bundle-Ether23.12
+   enable
+  !
+  interface Bundle-Ether26.26
+   enable
+  !
+ !
+!
+performance-measurement
+ interface TenGigE0/0/0/10
+  delay-measurement
+   advertise-delay 12
+  !
+ !
+!
